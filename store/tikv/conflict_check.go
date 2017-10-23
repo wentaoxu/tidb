@@ -4,6 +4,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	//"github.com/zond/gotomic"
 	"sync"
+	"github.com/pingcap/tidb/kv"
 )
 
 type conflictCheckTable struct {
@@ -35,7 +36,7 @@ func(c *conflictCheckTable) get(key []byte) interface {} {
 	}
 }
 
-func checkConflict(keys [][]byte, txn *tikvTxn) chan(struct{}) {
+func checkConflict(keys [][]byte, txn *tikvTxn) (chan(struct{}), error) {
 	conflictTable.lock.Lock()
 	defer  conflictTable.lock.Unlock()
 	for _, key := range keys {
@@ -45,7 +46,11 @@ func checkConflict(keys [][]byte, txn *tikvTxn) chan(struct{}) {
 			conflictTxn, ok := value.(*tikvTxn)
 			if ok {
 				//log.Infof("[XUWT] txn(%d) get conflicted txn(%d) with status(%d)", txn.startTS, conflictTxn.startTS, conflictTxn.status)
-				return conflictTxn.blocked
+				if conflictTxn.status == txnOnGoing {
+					return conflictTxn.blocked, kv.ErrLockConflict
+				} else if conflictTxn.commitTS > txn.startTS {
+					return nil, kv.ErrLockConflict
+				}
 			} else {
 				log.Fatal("can get txn")
 			}
@@ -54,7 +59,7 @@ func checkConflict(keys [][]byte, txn *tikvTxn) chan(struct{}) {
 	for _, key := range keys {
 		conflictTable.put(key, txn)
 	}
-	return nil
+	return nil, nil
 }
 
 func deleteKeys(keys [][]byte) {

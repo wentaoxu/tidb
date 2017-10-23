@@ -166,13 +166,13 @@ func (txn *tikvTxn) Commit() error {
 		return errors.Trace(err)
 	}
 
-	wait := txn.checkLocalConflict()
-	if wait != nil {
+	wait, err := txn.checkLocalConflict()
+	if err != nil {
 		txn.wait = wait
 		flag = txnRollback
-		return kv.ErrLockConflict
+		return err
 	}
-	defer txn.deleteKeys()
+	//defer txn.deleteKeys()
 
 	committer, err := newTwoPhaseCommitter(txn)
 	if err != nil {
@@ -237,14 +237,14 @@ func (txn *tikvTxn) Size() int {
 	return txn.us.Size()
 }
 
-func (txn *tikvTxn) checkLocalConflict() chan(struct{}) {
-	wait := checkConflict(txn.lockKeys, txn)
+func (txn *tikvTxn) checkLocalConflict() (chan(struct{}), error) {
+	wait, err := checkConflict(txn.lockKeys, txn)
 	if wait == nil {
 		//log.Infof("[XUWT] txn(%d) go well", txn.startTS)
 	} else {
 		log.Infof("[XUWT] txn(%d) found conflicted keys", txn.startTS)
 	}
-	return wait
+	return wait, err
 }
 
 func (txn *tikvTxn) deleteKeys() {
@@ -252,6 +252,8 @@ func (txn *tikvTxn) deleteKeys() {
 }
 
 func (txn *tikvTxn) WaitForConflict() {
-	<-txn.wait
+	if txn.wait != nil {
+		<-txn.wait
+	}
 	return
 }
