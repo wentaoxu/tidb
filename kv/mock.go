@@ -94,8 +94,8 @@ func (t *mockTxn) Size() int {
 	return 0
 }
 
-func (t *mockTxn) WaitForConflict() {
-	return
+func (t *mockTxn) GetBlocked() chan struct{} {
+	return nil
 }
 
 // mockStorage is used to start a must commit-failed txn.
@@ -188,6 +188,6 @@ func (s *mockSnapshot) SeekReverse(k Key) (Iterator, error) {
 	return s.store.SeekReverse(k)
 }
 
-func (s *mockSnapshot) WaitForConflict() {
-	return
+func (s *mockSnapshot) GetBlocked() chan struct{}{
+	return nil
 }

@@ -46,8 +46,7 @@ type tikvTxn struct {
 	lockKeys  [][]byte
 	dirty     bool
 	setCnt    int64
-	blocked   chan (struct{})
-	wait      chan (struct{})
+	blocked   chan struct{}
 }
 
 func newTiKVTxn(store *tikvStore) (*tikvTxn, error) {
@@ -70,7 +69,6 @@ func newTikvTxnWithStartTS(store *tikvStore, startTS uint64) (*tikvTxn, error) {
 		startTS:   startTS,
 		startTime: time.Now(),
 		status:     txnOnGoing,
-		blocked:   make(chan (struct{})),
 	}, nil
 }
 
@@ -166,14 +164,7 @@ func (txn *tikvTxn) Commit() error {
 		return errors.Trace(err)
 	}
 
-	wait, err := txn.checkLocalConflict()
-	if err != nil {
-		txn.wait = wait
-		flag = txnRollback
-		return err
-	}
-	//defer txn.deleteKeys()
-
+	txn.blocked = txn.checkLocalConflict()
 	committer, err := newTwoPhaseCommitter(txn)
 	if err != nil {
 		flag = txnRollback
@@ -194,7 +185,6 @@ func (txn *tikvTxn) Commit() error {
 }
 
 func (txn *tikvTxn) close(flag int) {
-	close(txn.blocked)
 	txn.status = flag
 }
 
@@ -237,23 +227,14 @@ func (txn *tikvTxn) Size() int {
 	return txn.us.Size()
 }
 
-func (txn *tikvTxn) checkLocalConflict() (chan(struct{}), error) {
-	wait, err := checkConflict(txn.lockKeys, txn)
-	if wait == nil {
-		//log.Infof("[XUWT] txn(%d) go well", txn.startTS)
-	} else {
-		log.Infof("[XUWT] txn(%d) found conflicted keys", txn.startTS)
-	}
-	return wait, err
+func (txn *tikvTxn) checkLocalConflict() chan struct{}  {
+	return checkConflict(txn.lockKeys)
 }
 
 func (txn *tikvTxn) deleteKeys() {
 	deleteKeys(txn.lockKeys)
 }
 
-func (txn *tikvTxn) WaitForConflict() {
-	if txn.wait != nil {
-		<-txn.wait
-	}
-	return
+func (txn *tikvTxn) GetBlocked() chan struct{}  {
+	return txn.blocked
 }
