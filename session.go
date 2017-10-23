@@ -423,7 +423,7 @@ func (s *session) retry(maxCnt int, infoSchemaChanged bool) error {
 				// We print the queries at the first try only.
 				log.Warnf("[%d] Retry [%d] query [%d] %s", connID, retryCnt, i, sqlForLog(txt))
 			} else {
-				log.Warnf("[%d] Retry [%d] query [%d]", connID, retryCnt, i)
+				log.Warnf("[%d] Retry [%d] query [%d] %s", connID, retryCnt, i, sqlForLog(txt))
 			}
 			s.sessionVars.StmtCtx = sr.stmtCtx
 			s.sessionVars.StmtCtx.ResetForRetry()
