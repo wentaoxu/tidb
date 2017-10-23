@@ -136,6 +136,7 @@ type session struct {
 	sessionManager util.SessionManager
 
 	statsCollector *statistics.SessionStatsCollector
+	prelock        *chan struct{}
 }
 
 // Cancel cancels the execution of current transaction.
@@ -247,11 +248,20 @@ func (s *schemaLeaseChecker) Check(txnTS uint64) error {
 	return domain.ErrInfoSchemaExpired
 }
 
-func (s *session) doCommit() error {
+func (s *session) doCommit(retry bool) error {
 	if s.txn == nil || !s.txn.Valid() {
 		return nil
 	}
 	defer func() {
+		if retry {
+			lock := s.txn.GetBlocked()
+			if lock != nil {
+				log.Infof("[XUWT] [%d] set lock", s.sessionVars.ConnectionID)
+			}
+			s.prelock = lock
+		} else {
+			s.prelock = nil
+		}
 		s.txn = nil
 		s.sessionVars.SetStatusFlag(mysql.ServerStatusInTrans, false)
 	}()
@@ -296,7 +306,7 @@ func (s *session) doCommitWithRetry() error {
 	if s.txn != nil && s.txn.Valid() {
 		txnSize = s.txn.Size()
 	}
-	err := s.doCommit()
+	err := s.doCommit(true)
 	if err != nil {
 		if s.isRetryableError(err) {
 			log.Warnf("[%d] retryable error: %v, txn: %v", s.sessionVars.ConnectionID, err, s.txn)
@@ -397,11 +407,20 @@ func (s *session) retry(maxCnt int, infoSchemaChanged bool) error {
 	defer func() {
 		s.sessionVars.RetryInfo.Retrying = false
 		sessionRetry.Observe(float64(retryCnt))
+		if s.prelock != nil {
+			log.Infof("[XUWT] [%d] unlock", connID)
+			<-*s.prelock
+			s.prelock = nil
+		}
 		s.txn = nil
 		s.sessionVars.SetStatusFlag(mysql.ServerStatusInTrans, false)
 	}()
 	nh := GetHistory(s)
 	var err error
+	if s.prelock != nil {
+		log.Infof("[XUWT] [%d] lock", connID)
+		*s.prelock<-struct{}{}
+	}
 	for {
 		s.PrepareTxnCtx()
 		s.sessionVars.RetryInfo.ResetOffset()
@@ -433,7 +452,7 @@ func (s *session) retry(maxCnt int, infoSchemaChanged bool) error {
 			}
 		}
 		if err == nil {
-			err = s.doCommit()
+			err = s.doCommit(true)
 			if err == nil {
 				break
 			}
@@ -1209,7 +1228,7 @@ func (s *session) PrepareTxnCtx() {
 
 // RefreshTxnCtx implements context.RefreshTxnCtx interface.
 func (s *session) RefreshTxnCtx() error {
-	if err := s.doCommit(); err != nil {
+	if err := s.doCommit(false); err != nil {
 		return errors.Trace(err)
 	}
 

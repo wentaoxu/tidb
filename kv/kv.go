@@ -135,7 +135,7 @@ type Transaction interface {
 	// Valid returns if the transaction is valid.
 	// A transaction become invalid after commit or rollback.
 	Valid() bool
-	GetBlocked() chan struct{}
+	GetBlocked() *chan struct{}
 }
 
 // Client is used to send request to KV layer.

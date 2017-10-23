@@ -120,6 +120,6 @@ func (t *InjectedSnapshot) Get(k Key) ([]byte, error) {
 	return t.Snapshot.Get(k)
 }
 
-func (t *InjectedSnapshot) GetBlocked() chan struct{} {
+func (t *InjectedSnapshot) GetBlocked() *chan struct{} {
 	return nil
 }

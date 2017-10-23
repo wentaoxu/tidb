@@ -94,7 +94,7 @@ func (t *mockTxn) Size() int {
 	return 0
 }
 
-func (t *mockTxn) GetBlocked() chan struct{} {
+func (t *mockTxn) GetBlocked() *chan struct{} {
 	return nil
 }
 

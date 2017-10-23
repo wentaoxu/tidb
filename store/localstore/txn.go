@@ -170,6 +170,6 @@ func (txn *dbTxn) Len() int {
 	return txn.us.Len()
 }
 
-func (txn *dbTxn) GetBlocked() chan struct{}  {
+func (txn *dbTxn) GetBlocked() *chan struct{}  {
 	return nil
 }

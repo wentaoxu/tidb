@@ -46,7 +46,7 @@ type tikvTxn struct {
 	lockKeys  [][]byte
 	dirty     bool
 	setCnt    int64
-	blocked   chan struct{}
+	blocked   *chan struct{}
 }
 
 func newTiKVTxn(store *tikvStore) (*tikvTxn, error) {
@@ -227,7 +227,8 @@ func (txn *tikvTxn) Size() int {
 	return txn.us.Size()
 }
 
-func (txn *tikvTxn) checkLocalConflict() chan struct{}  {
+func (txn *tikvTxn) checkLocalConflict() *chan struct{}  {
+	log.Infof("[XUWT] txn(%d) check conflict", txn.startTS)
 	return checkConflict(txn.lockKeys)
 }
 
@@ -235,6 +236,6 @@ func (txn *tikvTxn) deleteKeys() {
 	deleteKeys(txn.lockKeys)
 }
 
-func (txn *tikvTxn) GetBlocked() chan struct{}  {
+func (txn *tikvTxn) GetBlocked() *chan struct{}  {
 	return txn.blocked
 }
