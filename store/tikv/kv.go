@@ -414,7 +414,7 @@ func parsePath(path string) (etcdAddrs []string, disableGC bool, err error) {
 		disableGC = true
 	case "false", "":
 	default:
-		err = errors.New("disableGC flag should be true/false")
+		err = errors.New("disableGC status should be true/false")
 		return
 	}
 	etcdAddrs = strings.Split(u.Host, ",")

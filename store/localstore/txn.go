@@ -169,3 +169,7 @@ func (txn *dbTxn) Size() int {
 func (txn *dbTxn) Len() int {
 	return txn.us.Len()
 }
+
+func (txn *dbTxn) WaitForConflict() {
+	return
+}

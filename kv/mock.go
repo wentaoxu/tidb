@@ -94,6 +94,10 @@ func (t *mockTxn) Size() int {
 	return 0
 }
 
+func (t *mockTxn) WaitForConflict() {
+	return
+}
+
 // mockStorage is used to start a must commit-failed txn.
 type mockStorage struct {
 }
@@ -182,4 +186,8 @@ func (s *mockSnapshot) Seek(k Key) (Iterator, error) {
 
 func (s *mockSnapshot) SeekReverse(k Key) (Iterator, error) {
 	return s.store.SeekReverse(k)
+}
+
+func (s *mockSnapshot) WaitForConflict() {
+	return
 }

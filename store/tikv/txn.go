@@ -28,6 +28,12 @@ var (
 	_ kv.Transaction = (*tikvTxn)(nil)
 )
 
+const (
+	txnOnGoing = iota
+	txnCommit
+	txnRollback
+)
+
 // tikvTxn implements kv.Transaction.
 type tikvTxn struct {
 	snapshot  *tikvSnapshot
@@ -36,10 +42,12 @@ type tikvTxn struct {
 	startTS   uint64
 	startTime time.Time // Monotonic timestamp for recording txn time consuming.
 	commitTS  uint64
-	valid     bool
+	status    int
 	lockKeys  [][]byte
 	dirty     bool
 	setCnt    int64
+	blocked   chan (struct{})
+	wait      chan (struct{})
 }
 
 func newTiKVTxn(store *tikvStore) (*tikvTxn, error) {
@@ -61,7 +69,8 @@ func newTikvTxnWithStartTS(store *tikvStore, startTS uint64) (*tikvTxn, error) {
 		store:     store,
 		startTS:   startTS,
 		startTime: time.Now(),
-		valid:     true,
+		status:     txnOnGoing,
+		blocked:   make(chan (struct{})),
 	}, nil
 }
 
@@ -141,10 +150,11 @@ func (txn *tikvTxn) DelOption(opt kv.Option) {
 }
 
 func (txn *tikvTxn) Commit() error {
-	if !txn.valid {
+	if txn.status != txnOnGoing {
 		return kv.ErrInvalidTxn
 	}
-	defer txn.close()
+	flag := txnCommit
+	defer txn.close(flag)
 
 	txnCmdCounter.WithLabelValues("set").Add(float64(txn.setCnt))
 	txnCmdCounter.WithLabelValues("commit").Inc()
@@ -152,11 +162,21 @@ func (txn *tikvTxn) Commit() error {
 	defer func() { txnCmdHistogram.WithLabelValues("commit").Observe(time.Since(start).Seconds()) }()
 
 	if err := txn.us.CheckLazyConditionPairs(); err != nil {
+		flag = txnRollback
 		return errors.Trace(err)
 	}
 
+	wait := txn.checkLocalConflict()
+	if wait != nil {
+		txn.wait = wait
+		flag = txnRollback
+		return kv.ErrLockConflict
+	}
+	defer txn.deleteKeys()
+
 	committer, err := newTwoPhaseCommitter(txn)
 	if err != nil {
+		flag = txnRollback
 		return errors.Trace(err)
 	}
 	if committer == nil {
@@ -165,6 +185,7 @@ func (txn *tikvTxn) Commit() error {
 	err = committer.execute()
 	if err != nil {
 		committer.writeFinishBinlog(binlog.BinlogType_Rollback, 0)
+		flag = txnRollback
 		return errors.Trace(err)
 	}
 	committer.writeFinishBinlog(binlog.BinlogType_Commit, int64(committer.commitTS))
@@ -172,15 +193,16 @@ func (txn *tikvTxn) Commit() error {
 	return nil
 }
 
-func (txn *tikvTxn) close() {
-	txn.valid = false
+func (txn *tikvTxn) close(flag int) {
+	close(txn.blocked)
+	txn.status = flag
 }
 
 func (txn *tikvTxn) Rollback() error {
-	if !txn.valid {
+	if txn.status != txnOnGoing {
 		return kv.ErrInvalidTxn
 	}
-	txn.close()
+	txn.close(txnRollback)
 	log.Infof("[kv] Rollback txn %d", txn.StartTS())
 	txnCmdCounter.WithLabelValues("rollback").Inc()
 
@@ -204,7 +226,7 @@ func (txn *tikvTxn) StartTS() uint64 {
 }
 
 func (txn *tikvTxn) Valid() bool {
-	return txn.valid
+	return txn.status == txnOnGoing
 }
 
 func (txn *tikvTxn) Len() int {
@@ -213,4 +235,23 @@ func (txn *tikvTxn) Len() int {
 
 func (txn *tikvTxn) Size() int {
 	return txn.us.Size()
+}
+
+func (txn *tikvTxn) checkLocalConflict() chan(struct{}) {
+	wait := checkConflict(txn.lockKeys, txn)
+	if wait == nil {
+		//log.Infof("[XUWT] txn(%d) go well", txn.startTS)
+	} else {
+		log.Infof("[XUWT] txn(%d) found conflicted keys", txn.startTS)
+	}
+	return wait
+}
+
+func (txn *tikvTxn) deleteKeys() {
+	deleteKeys(txn.lockKeys)
+}
+
+func (txn *tikvTxn) WaitForConflict() {
+	<-txn.wait
+	return
 }
