@@ -581,3 +581,21 @@ const (
 	codeInvalidColumnCount = 5
 	codeInvalidKey         = 6
 )
+
+func IsRecordKey(key kv.Key) bool {
+	if !key.HasPrefix(tablePrefix) {
+		return false
+	}
+
+	key = key[len(tablePrefix):]
+	var err error
+	key, _, err = codec.DecodeInt(key)
+	if err != nil {
+		return false
+	}
+
+	if key.HasPrefix(recordPrefixSep) {
+		return true
+	}
+	return false
+}

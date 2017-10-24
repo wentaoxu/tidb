@@ -5,6 +5,7 @@ import (
 	"github.com/pingcap/tidb/util/lock"
 	log "github.com/Sirupsen/logrus"
 	"sort"
+	"github.com/pingcap/tidb/tablecodec"
 )
 
 type conflictCheckTable struct {
@@ -38,10 +39,10 @@ func(c *conflictCheckTable) delete (key []byte) {
 }
 
 func(c *conflictCheckTable) get(key string) *lock.WaitLock {
-	log.Infof("[XUWT] check key(%s)", string(key))
+	//log.Infof("[XUWT] check key(%s)", string(key))
 	value, ok := c.hashTable.Get(gotomic.StringKey(key))
 	if ok {
-		log.Infof("[XUWT] get key(%s)", string(key))
+		//log.Infof("[XUWT] get key(%s)", string(key))
 		lock := value.(*lock.WaitLock)
 		return lock
 	} else {
@@ -52,13 +53,20 @@ func(c *conflictCheckTable) get(key string) *lock.WaitLock {
 func checkConflict(keys [][]byte) []*lock.WaitLock  {
 	//conflictTable.lock.Lock()
 	//defer conflictTable.lock.Unlock()
-	lockArray := []*lock.WaitLock{}
-	sortKeys := []string{}
+	uniq := make(map[string]int)
 	for _, key := range keys {
-		sortKeys = append(sortKeys, string(key))
+		if tablecodec.IsRecordKey(key) {
+			uniq[string(key)] = 0
+		}
+	}
+
+	sortKeys := []string{}
+	for key, _ := range uniq {
+		sortKeys = append(sortKeys, key)
 	}
 	sort.Strings(sortKeys)
 
+	lockArray := []*lock.WaitLock{}
 	for _, key := range sortKeys {
 		lock := conflictTable.get(key)
 		if lock == nil {
@@ -66,6 +74,7 @@ func checkConflict(keys [][]byte) []*lock.WaitLock  {
 		}
 		lockArray = append(lockArray, lock)
 	}
+	log.Infof("[XUWT] lock array len %d", len(lockArray))
 	return lockArray
 }
 
