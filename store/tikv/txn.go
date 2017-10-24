@@ -232,7 +232,7 @@ func (txn *tikvTxn) Size() int {
 }
 
 func (txn *tikvTxn) checkLocalConflict(keys [][]byte)  []*lock.WaitLock {
-	log.Infof("[XUWT] txn(%d) check conflict", txn.startTS)
+	//log.Infof("[XUWT] txn(%d) check conflict", txn.startTS)
 	return checkConflict(keys)
 }
 

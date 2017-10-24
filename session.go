@@ -257,7 +257,7 @@ func (s *session) doCommit(retry bool) error {
 		if retry {
 			lockArray := s.txn.GetBlocked()
 			if lockArray != nil {
-				log.Infof("[XUWT] [%d] set lock", s.sessionVars.ConnectionID)
+				//log.Infof("[XUWT] [%d] set lock", s.sessionVars.ConnectionID)
 			}
 			s.prelocks = lockArray
 		} else {

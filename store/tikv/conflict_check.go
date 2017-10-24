@@ -6,6 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"sort"
 	"github.com/pingcap/tidb/tablecodec"
+	fnv "hash/fnv"
 )
 
 type conflictCheckTable struct {
@@ -17,13 +18,13 @@ type conflictCheckTable struct {
 
 var conflictTable *conflictCheckTable
 
-func(c *conflictCheckTable) put(key string) *lock.WaitLock {
-	log.Infof("[XUWT] put key(%s)", string(key))
+func(c *conflictCheckTable) put(key int) *lock.WaitLock {
+	//log.Infof("[XUWT] put key(%d)", key)
 	putLock := lock.NewWaitLock()
-	if c.hashTable.PutIfMissing(gotomic.StringKey(key), putLock) {
+	if c.hashTable.PutIfMissing(gotomic.IntKey(key), putLock) {
 		return putLock
 	} else {
-		value, ok := c.hashTable.Get(gotomic.StringKey(key))
+		value, ok := c.hashTable.Get(gotomic.IntKey(key))
 		if ok {
 			waitLock := value.(*lock.WaitLock)
 			return waitLock
@@ -38,9 +39,9 @@ func(c *conflictCheckTable) delete (key []byte) {
 	//log.Infof("[XUWT] delete key(%s)", string(key))
 }
 
-func(c *conflictCheckTable) get(key string) *lock.WaitLock {
+func(c *conflictCheckTable) get(key int) *lock.WaitLock {
 	//log.Infof("[XUWT] check key(%s)", string(key))
-	value, ok := c.hashTable.Get(gotomic.StringKey(key))
+	value, ok := c.hashTable.Get(gotomic.IntKey(key))
 	if ok {
 		//log.Infof("[XUWT] get key(%s)", string(key))
 		lock := value.(*lock.WaitLock)
@@ -53,18 +54,20 @@ func(c *conflictCheckTable) get(key string) *lock.WaitLock {
 func checkConflict(keys [][]byte) []*lock.WaitLock  {
 	//conflictTable.lock.Lock()
 	//defer conflictTable.lock.Unlock()
-	uniq := make(map[string]int)
+	uniq := make(map[uint32]int)
 	for _, key := range keys {
 		if tablecodec.IsRecordKey(key) {
-			uniq[string(key)] = 0
+			fnv := fnv.New32()
+			fnv.Write(key)
+			uniq[fnv.Sum32()] = 0
 		}
 	}
 
-	sortKeys := []string{}
+	sortKeys := []int{}
 	for key, _ := range uniq {
-		sortKeys = append(sortKeys, key)
+		sortKeys = append(sortKeys, int(key))
 	}
-	sort.Strings(sortKeys)
+	sort.Ints(sortKeys)
 
 	lockArray := []*lock.WaitLock{}
 	for _, key := range sortKeys {
@@ -74,7 +77,7 @@ func checkConflict(keys [][]byte) []*lock.WaitLock  {
 		}
 		lockArray = append(lockArray, lock)
 	}
-	log.Infof("[XUWT] lock array len %d", len(lockArray))
+	//log.Infof("[XUWT] lock array len %d", len(lockArray))
 	return lockArray
 }
 
