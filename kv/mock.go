@@ -16,6 +16,7 @@ package kv
 import (
 	"github.com/juju/errors"
 	"github.com/pingcap/tidb/store/tikv/oracle"
+	"github.com/pingcap/tidb/util/lock"
 )
 
 // mockTxn is a txn that returns a retryAble error when called Commit.
@@ -94,7 +95,7 @@ func (t *mockTxn) Size() int {
 	return 0
 }
 
-func (t *mockTxn) GetBlocked() *chan struct{} {
+func (t *mockTxn) GetBlocked() []*lock.WaitLock {
 	return nil
 }
 
@@ -188,6 +189,6 @@ func (s *mockSnapshot) SeekReverse(k Key) (Iterator, error) {
 	return s.store.SeekReverse(k)
 }
 
-func (s *mockSnapshot) GetBlocked() chan struct{}{
+func (s *mockSnapshot) GetBlocked() []*lock.WaitLock {
 	return nil
 }

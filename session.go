@@ -55,6 +55,7 @@ import (
 	"github.com/pingcap/tidb/util/types"
 	"github.com/pingcap/tipb/go-binlog"
 	goctx "golang.org/x/net/context"
+	"github.com/pingcap/tidb/util/lock"
 )
 
 // Session context
@@ -136,7 +137,7 @@ type session struct {
 	sessionManager util.SessionManager
 
 	statsCollector *statistics.SessionStatsCollector
-	prelock        *chan struct{}
+	prelocks       []*lock.WaitLock
 }
 
 // Cancel cancels the execution of current transaction.
@@ -254,13 +255,13 @@ func (s *session) doCommit(retry bool) error {
 	}
 	defer func() {
 		if retry {
-			lock := s.txn.GetBlocked()
-			if lock != nil {
+			lockArray := s.txn.GetBlocked()
+			if lockArray != nil {
 				log.Infof("[XUWT] [%d] set lock", s.sessionVars.ConnectionID)
 			}
-			s.prelock = lock
+			s.prelocks = lockArray
 		} else {
-			s.prelock = nil
+			s.prelocks = nil
 		}
 		s.txn = nil
 		s.sessionVars.SetStatusFlag(mysql.ServerStatusInTrans, false)
@@ -407,19 +408,23 @@ func (s *session) retry(maxCnt int, infoSchemaChanged bool) error {
 	defer func() {
 		s.sessionVars.RetryInfo.Retrying = false
 		sessionRetry.Observe(float64(retryCnt))
-		if s.prelock != nil {
-			log.Infof("[XUWT] [%d] unlock", connID)
-			<-*s.prelock
-			s.prelock = nil
+		if s.prelocks != nil {
+			//log.Infof("[XUWT] [%d] unlock", connID)
+			for _, lock := range s.prelocks {
+				lock.UnLock()
+			}
+			s.prelocks = nil
 		}
 		s.txn = nil
 		s.sessionVars.SetStatusFlag(mysql.ServerStatusInTrans, false)
 	}()
 	nh := GetHistory(s)
 	var err error
-	if s.prelock != nil {
-		log.Infof("[XUWT] [%d] lock", connID)
-		*s.prelock<-struct{}{}
+	if s.prelocks != nil {
+		//log.Infof("[XUWT] [%d] lock", connID)
+		for _, lock := range s.prelocks {
+			lock.Lock()
+		}
 	}
 	for {
 		s.PrepareTxnCtx()

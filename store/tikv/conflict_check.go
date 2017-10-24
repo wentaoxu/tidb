@@ -2,10 +2,9 @@ package tikv
 
 import (
 	"github.com/zond/gotomic"
-	//"sync"
-	//log "github.com/Sirupsen/logrus"
-	//"github.com/pingcap/tidb/kv"
+	"github.com/pingcap/tidb/util/lock"
 	log "github.com/Sirupsen/logrus"
+	"sort"
 )
 
 type conflictCheckTable struct {
@@ -17,16 +16,16 @@ type conflictCheckTable struct {
 
 var conflictTable *conflictCheckTable
 
-func(c *conflictCheckTable) put(key []byte) *chan struct{} {
+func(c *conflictCheckTable) put(key string) *lock.WaitLock {
 	log.Infof("[XUWT] put key(%s)", string(key))
-	lock := make(chan struct{}, 1)
-	if c.hashTable.PutIfMissing(gotomic.StringKey(key), &lock) {
-		return &lock
+	putLock := lock.NewWaitLock()
+	if c.hashTable.PutIfMissing(gotomic.StringKey(key), putLock) {
+		return putLock
 	} else {
 		value, ok := c.hashTable.Get(gotomic.StringKey(key))
 		if ok {
-			lock := value.(*chan struct{})
-			return lock
+			waitLock := value.(*lock.WaitLock)
+			return waitLock
 		}
 	}
 
@@ -38,30 +37,36 @@ func(c *conflictCheckTable) delete (key []byte) {
 	//log.Infof("[XUWT] delete key(%s)", string(key))
 }
 
-func(c *conflictCheckTable) get(key []byte) *chan struct{} {
+func(c *conflictCheckTable) get(key string) *lock.WaitLock {
 	log.Infof("[XUWT] check key(%s)", string(key))
 	value, ok := c.hashTable.Get(gotomic.StringKey(key))
 	if ok {
 		log.Infof("[XUWT] get key(%s)", string(key))
-		lock := value.(*chan struct{})
+		lock := value.(*lock.WaitLock)
 		return lock
 	} else {
 		return nil
 	}
 }
 
-func checkConflict(keys [][]byte) *chan struct{}  {
+func checkConflict(keys [][]byte) []*lock.WaitLock  {
 	//conflictTable.lock.Lock()
 	//defer conflictTable.lock.Unlock()
+	lockArray := []*lock.WaitLock{}
+	sortKeys := []string{}
 	for _, key := range keys {
+		sortKeys = append(sortKeys, string(key))
+	}
+	sort.Strings(sortKeys)
+
+	for _, key := range sortKeys {
 		lock := conflictTable.get(key)
 		if lock == nil {
-			return conflictTable.put(key)
-		} else {
-			return lock
+			lock = conflictTable.put(key)
 		}
+		lockArray = append(lockArray, lock)
 	}
-	return nil
+	return lockArray
 }
 
 func deleteKeys(keys [][]byte) {

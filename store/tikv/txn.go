@@ -22,6 +22,7 @@ import (
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tipb/go-binlog"
 	goctx "golang.org/x/net/context"
+	"github.com/pingcap/tidb/util/lock"
 )
 
 var (
@@ -46,7 +47,7 @@ type tikvTxn struct {
 	lockKeys  [][]byte
 	dirty     bool
 	setCnt    int64
-	blocked   *chan struct{}
+	blocked   []*lock.WaitLock
 }
 
 func newTiKVTxn(store *tikvStore) (*tikvTxn, error) {
@@ -170,7 +171,7 @@ func (txn *tikvTxn) Commit() error {
 		return errors.Trace(err)
 	}
 
-	if committer != nil {
+	if committer != nil && len(committer.keys) != 0 {
 		txn.blocked = txn.checkLocalConflict(committer.keys)
 	}
 	if committer == nil {
@@ -230,7 +231,7 @@ func (txn *tikvTxn) Size() int {
 	return txn.us.Size()
 }
 
-func (txn *tikvTxn) checkLocalConflict(keys [][]byte) *chan struct{}  {
+func (txn *tikvTxn) checkLocalConflict(keys [][]byte)  []*lock.WaitLock {
 	log.Infof("[XUWT] txn(%d) check conflict", txn.startTS)
 	return checkConflict(keys)
 }
@@ -239,6 +240,6 @@ func (txn *tikvTxn) deleteKeys() {
 	deleteKeys(txn.lockKeys)
 }
 
-func (txn *tikvTxn) GetBlocked() *chan struct{}  {
+func (txn *tikvTxn) GetBlocked() []*lock.WaitLock {
 	return txn.blocked
 }

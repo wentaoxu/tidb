@@ -20,6 +20,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/terror"
+	"github.com/pingcap/tidb/util/lock"
 )
 
 var (
@@ -170,6 +171,6 @@ func (txn *dbTxn) Len() int {
 	return txn.us.Len()
 }
 
-func (txn *dbTxn) GetBlocked() *chan struct{}  {
+func (txn *dbTxn) GetBlocked() []*lock.WaitLock   {
 	return nil
 }

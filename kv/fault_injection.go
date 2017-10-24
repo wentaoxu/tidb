@@ -13,7 +13,10 @@
 
 package kv
 
-import "sync"
+import (
+	"sync"
+	"github.com/pingcap/tidb/util/lock"
+)
 
 // InjectionConfig is used for fault injections for KV components.
 type InjectionConfig struct {
@@ -120,6 +123,6 @@ func (t *InjectedSnapshot) Get(k Key) ([]byte, error) {
 	return t.Snapshot.Get(k)
 }
 
-func (t *InjectedSnapshot) GetBlocked() *chan struct{} {
+func (t *InjectedSnapshot) GetBlocked() []*lock.WaitLock {
 	return nil
 }

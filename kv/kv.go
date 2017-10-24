@@ -16,6 +16,7 @@ package kv
 import (
 	"github.com/pingcap/tidb/store/tikv/oracle"
 	goctx "golang.org/x/net/context"
+	"github.com/pingcap/tidb/util/lock"
 )
 
 // Transaction options
@@ -135,7 +136,7 @@ type Transaction interface {
 	// Valid returns if the transaction is valid.
 	// A transaction become invalid after commit or rollback.
 	Valid() bool
-	GetBlocked() *chan struct{}
+	GetBlocked() []*lock.WaitLock
 }
 
 // Client is used to send request to KV layer.
