@@ -164,11 +164,14 @@ func (txn *tikvTxn) Commit() error {
 		return errors.Trace(err)
 	}
 
-	txn.blocked = txn.checkLocalConflict()
 	committer, err := newTwoPhaseCommitter(txn)
 	if err != nil {
 		flag = txnRollback
 		return errors.Trace(err)
+	}
+
+	if committer != nil {
+		txn.blocked = txn.checkLocalConflict(committer.keys)
 	}
 	if committer == nil {
 		return nil
@@ -227,9 +230,9 @@ func (txn *tikvTxn) Size() int {
 	return txn.us.Size()
 }
 
-func (txn *tikvTxn) checkLocalConflict() *chan struct{}  {
+func (txn *tikvTxn) checkLocalConflict(keys [][]byte) *chan struct{}  {
 	log.Infof("[XUWT] txn(%d) check conflict", txn.startTS)
-	return checkConflict(txn.lockKeys)
+	return checkConflict(keys)
 }
 
 func (txn *tikvTxn) deleteKeys() {

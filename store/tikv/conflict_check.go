@@ -31,7 +31,9 @@ func(c *conflictCheckTable) delete (key []byte) {
 
 func(c *conflictCheckTable) get(key []byte) *chan struct{} {
 	lock, ok := c.waitList[string(key)]
+	log.Infof("[XUWT] check key(%s)", string(key))
 	if ok {
+		log.Infof("[XUWT] get key(%s)", string(key))
 		return lock
 	} else {
 		return nil
