@@ -422,7 +422,7 @@ func (s *session) retry(maxCnt int, infoSchemaChanged bool) error {
 	var err error
 	if s.prelocks != nil {
 		//log.Infof("[XUWT] [%d] lock", connID)
-		timeout, _ := goctx.WithTimeout(s.goCtx, 1 * time.Second)
+		timeout, _ := goctx.WithTimeout(s.goCtx, 3 * time.Second)
 		for _, lock := range s.prelocks {
 			if !lock.Lock(timeout) {
 				return kv.ErrLockConflict
