@@ -3,7 +3,6 @@ package tikv
 import (
 	"github.com/zond/gotomic"
 	"github.com/pingcap/tidb/util/lock"
-	log "github.com/Sirupsen/logrus"
 	"sort"
 	"github.com/pingcap/tidb/tablecodec"
 	fnv "hash/fnv"
