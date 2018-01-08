@@ -545,6 +545,10 @@ type RegionVerID struct {
 	ver     uint64
 }
 
+func (r *RegionVerID) ID() uint64 {
+	return r.id;
+}
+
 // VerID returns the Region's RegionVerID.
 func (r *Region) VerID() RegionVerID {
 	return RegionVerID{
