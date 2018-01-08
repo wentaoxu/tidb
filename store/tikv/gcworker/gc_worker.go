@@ -429,7 +429,7 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, safePoint uint64, ident
 		loc, err := store.GetRegionCache().LocateKey(bo, key)
 		elapse := time.Since(start)
 		if elapse > 1 * time.Second {
-			log.Warnf("[gc worker] %s , slow scan lock, region: %d, cost time: %s", identifier, loc.Region.ID(), elapse)
+			log.Warnf("[gc worker] %s , slow get region, region: %d, cost time: %s", identifier, loc.Region.ID(), elapse)
 		}
 
 		if err != nil {
