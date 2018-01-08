@@ -41,7 +41,7 @@ var MaxConnectionCount = 16
 const (
 	dialTimeout       = 5 * time.Second
 	readTimeoutShort  = 20 * time.Second  // For requests that read/write several key-values.
-	ReadTimeoutMedium = 1800 * time.Second  // For requests that may need scan region.
+	ReadTimeoutMedium = 7200 * time.Second  // For requests that may need scan region.
 	ReadTimeoutLong   = 150 * time.Second // For requests that may need scan region multiple times.
 
 	grpcInitialWindowSize     = 1 << 30
