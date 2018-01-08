@@ -25,6 +25,7 @@ import (
 	"github.com/pingcap/tidb/store/tikv/tikvrpc"
 	log "github.com/sirupsen/logrus"
 	goctx "golang.org/x/net/context"
+	"time"
 )
 
 const resolvedCacheSize = 512
@@ -190,7 +191,13 @@ func (lr *LockResolver) ResolveLocks(bo *Backoffer, locks []*Lock) (ok bool, err
 			cleanTxns[l.TxnID] = cleanRegions
 		}
 
+		start := time.Now()
 		err = lr.resolveLock(bo, l, status, cleanRegions)
+		elapse := time.Since(start)
+		if elapse > 1*time.Second {
+			log.Warnf("[gc worker] slow resolve lock, txn: %d, cost time: %s", l.TxnID, elapse)
+		}
+
 		if err != nil {
 			return false, errors.Trace(err)
 		}

@@ -425,11 +425,24 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, safePoint uint64, ident
 		default:
 		}
 
+		start := time.Now()
 		loc, err := store.GetRegionCache().LocateKey(bo, key)
+		elapse := time.Since(start)
+		if elapse > 1 * time.Second {
+			log.Warnf("[gc worker] %s , slow scan lock, region: %d, cost time: %s", identifier, loc.Region.ID(), elapse)
+		}
+
 		if err != nil {
 			return errors.Trace(err)
 		}
+
+		start = time.Now()
 		resp, err := store.SendReq(bo, req, loc.Region, tikv.ReadTimeoutMedium)
+		elapse = time.Since(start)
+		if elapse > 1 * time.Second {
+			log.Warnf("[gc worker] %s , slow scan lock, region: %d, cost time: %s", identifier, loc.Region.ID(), elapse)
+		}
+
 		if err != nil {
 			return errors.Trace(err)
 		}
@@ -515,12 +528,7 @@ func doGC(ctx goctx.Context, store tikv.Storage, safePoint uint64, identifier st
 			return errors.Trace(err)
 		}
 
-		start := time.Now()
 		resp, err := store.SendReq(bo, req, loc.Region, tikv.ReadTimeoutLong)
-		elapse := time.Since(start)
-		if elapse > 10 * time.Second {
-			log.Warnf("[gc worker] %s , slow scan lock, region: %d, cost time: %s", identifier, loc.Region.ID(), elapse)
-		}
 		if err != nil {
 			return errors.Trace(err)
 		}
