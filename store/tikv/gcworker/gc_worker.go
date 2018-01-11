@@ -526,7 +526,7 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, bo *tikv.Backoffer, ide
 		default:
 		}
 
-		if len(task.endKey) != 0 && key.Cmp(task.endKey) > 0 {
+		if len(task.endKey) != 0 && key.Cmp(task.endKey) >= 0 {
 			break
 		}
 
