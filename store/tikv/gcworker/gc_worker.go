@@ -120,7 +120,8 @@ const (
 	gcSafePointKey           = "tikv_gc_safe_point"
 	gcSafePointCacheInterval = tikv.GcSafePointCacheInterval
 
-	gcJobConcurrency = 200
+	gcScanLockLimit  = 1000
+	gcJobConcurrency = 1000
 )
 
 var gcVariableComments = map[string]string{
@@ -509,6 +510,7 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, bo *tikv.Backoffer, ide
 		Type: tikvrpc.CmdScanLock,
 		ScanLock: &kvrpcpb.ScanLockRequest{
 			MaxVersion: task.safePoint,
+			Limit:      gcScanLockLimit,
 		},
 	}
 
@@ -570,11 +572,14 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, bo *tikv.Backoffer, ide
 			}
 			continue
 		}
-		regions++
+
 		totalResolvedLocks += len(locks)
-		key = loc.EndKey
-		if len(key) == 0 {
-			break
+		if len(locks) < gcScanLockLimit {
+			regions++
+			key = loc.EndKey
+			if len(key) == 0 {
+				break
+			}
 		}
 	}
 	log.Infof("[gc worker] %s finish resolve locks, safePoint: %v, regions: %v, total resolved: %v, cost time: %s", identifier, task.safePoint, regions, totalResolvedLocks, time.Since(startTime))
