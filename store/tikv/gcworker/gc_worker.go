@@ -615,6 +615,10 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, bo *tikv.Backoffer, ide
 			if len(key) == 0 {
 				break
 			}
+			req.ScanLock.StartKey = []byte("")
+		} else {
+			// if len(locks) is '0', we should get into the branch above, not here.
+			req.ScanLock.StartKey = locks[len(locks)-1].Key
 		}
 	}
 	gcHistogram.WithLabelValues("resolve_locks").Observe(time.Since(startTime).Seconds())
