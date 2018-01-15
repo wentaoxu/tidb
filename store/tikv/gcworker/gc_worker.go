@@ -608,7 +608,7 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, bo *tikv.Backoffer, ide
 			continue
 		}
 
-		totalResolvedLocks += len(locks)
+		totalResolvedLocks += uint64(len(locks))
 		if len(locks) < gcScanLockLimit {
 			regions++
 			key = loc.EndKey
