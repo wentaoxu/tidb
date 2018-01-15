@@ -119,9 +119,9 @@ const (
 	gcDefaultLifeTime        = time.Minute * 10
 	gcSafePointKey           = "tikv_gc_safe_point"
 	gcSafePointCacheInterval = tikv.GcSafePointCacheInterval
-
 	gcJobConcurrency        = "tikv_gc_job_concurrency"
 	gcDefaultJobConcurrency = 100
+	gcScanLockLimit          = 1000
 )
 
 var gcVariableComments = map[string]string{
@@ -545,6 +545,7 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, bo *tikv.Backoffer, ide
 		Type: tikvrpc.CmdScanLock,
 		ScanLock: &kvrpcpb.ScanLockRequest{
 			MaxVersion: task.safePoint,
+			Limit:      gcScanLockLimit,
 		},
 	}
 
@@ -606,11 +607,14 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, bo *tikv.Backoffer, ide
 			}
 			continue
 		}
-		regions++
-		totalResolvedLocks += uint64(len(locks))
-		key = loc.EndKey
-		if len(key) == 0 {
-			break
+
+		totalResolvedLocks += len(locks)
+		if len(locks) < gcScanLockLimit {
+			regions++
+			key = loc.EndKey
+			if len(key) == 0 {
+				break
+			}
 		}
 	}
 	gcHistogram.WithLabelValues("resolve_locks").Observe(time.Since(startTime).Seconds())
