@@ -600,7 +600,8 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, bo *tikv.Backoffer, ide
 		for i := range locksInfo {
 			locks[i] = tikv.NewLock(locksInfo[i])
 		}
-		ok, err1 := store.GetLockResolver().ResolveLocks(bo, locks)
+
+		ok, err1 := store.GetLockResolver().BatchResolveLocks(bo, locks, loc.Region)
 		if err1 != nil {
 			return regions, totalResolvedLocks, errors.Trace(err1)
 		}
@@ -857,6 +858,9 @@ func (w *GCWorker) loadValueFromSysTable(key string, s tidb.Session) (string, er
 	goCtx := goctx.Background()
 	stmt := fmt.Sprintf(`SELECT (variable_value) FROM mysql.tidb WHERE variable_name='%s' FOR UPDATE`, key)
 	rs, err := s.Execute(goCtx, stmt)
+	if len(rs) > 0 {
+		defer terror.Call(rs[0].Close)
+	}
 	if err != nil {
 		return "", errors.Trace(err)
 	}
