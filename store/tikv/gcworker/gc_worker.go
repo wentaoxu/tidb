@@ -435,7 +435,7 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, safePoint uint64, ident
 		if err != nil {
 			return errors.Trace(err)
 		}
-		log.Infof("[gc worker] region gap (%s, %s), start key is %s", loc.StartKey, loc.EndKey, key)
+		log.Infof("[gc worker] region gap (%s, %s), start key is %s", string(loc.StartKey), string(loc.EndKey), string(key))
 		resp, err := store.SendReq(bo, req, loc.Region, tikv.ReadTimeoutMedium)
 		if err != nil {
 			return errors.Trace(err)
