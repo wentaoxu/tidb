@@ -565,6 +565,10 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, bo *tikv.Backoffer, ide
 			break
 		}
 
+		// we'd better keep 'req.ScanLock.StartKey' the same as 'key' to avoid
+		// the error 'key is not in region' when the region split for several pieces, or
+		// merge into one piece.
+		req.ScanLock.StartKey = key
 		loc, err := store.GetRegionCache().LocateKey(bo, key)
 		if err != nil {
 			return regions, totalResolvedLocks, errors.Trace(err)
@@ -615,10 +619,9 @@ func resolveLocks(ctx goctx.Context, store tikv.Storage, bo *tikv.Backoffer, ide
 			if len(key) == 0 {
 				break
 			}
-			req.ScanLock.StartKey = []byte("")
 		} else {
 			// if len(locks) is '0', we should get into the branch above, not here.
-			req.ScanLock.StartKey = locks[len(locks)-1].Key
+			key = locks[len(locks)-1].Key
 		}
 	}
 	gcHistogram.WithLabelValues("resolve_locks").Observe(time.Since(startTime).Seconds())
