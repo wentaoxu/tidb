@@ -154,7 +154,7 @@ const (
 	splitRegionBackoff      = 20000
 )
 
-var commitMaxBackoff = 20000
+var commitMaxBackoff = 41000
 
 // Backoffer is a utility for retrying queries.
 type Backoffer struct {
