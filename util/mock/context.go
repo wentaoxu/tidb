@@ -26,6 +26,7 @@ import (
 	"github.com/pingcap/tidb/util"
 	"github.com/pingcap/tidb/util/kvcache"
 	binlog "github.com/pingcap/tipb/go-binlog"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
@@ -108,6 +109,7 @@ func (c *Context) NewTxn() error {
 		return errors.New("store is not set")
 	}
 	if c.txn != nil && c.txn.Valid() {
+		log.Infof("[txn %d] commit anonymously before begin new txn", c.txn.StartTS())
 		err := c.txn.Commit(c.ctx)
 		if err != nil {
 			return errors.Trace(err)
